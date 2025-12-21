@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PULSE: ADDICTIVE 500</title>
+    <style>
+        :root { --danger: #ff4757; --safe: #2ed573; --bg: #050505; --card: #121212; --accent: #3498db; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        .header { background: #000; padding: 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .score { font-family: monospace; color: var(--accent); font-weight: bold; font-size: 1.1rem; }
+
+        .meters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: #0a0a0a; border-bottom: 2px solid #222; }
+        .meter-container { display: flex; flex-direction: column; gap: 5px; }
+        .meter-label { font-size: 0.55rem; text-transform: uppercase; color: #666; font-weight: 800; letter-spacing: 1px; }
+        .meter-track { height: 10px; background: #1a1a1a; border-radius: 5px; overflow: hidden; border: 1px solid #333; }
+        .meter-fill { height: 100%; width: 100%; transition: width 0.4s ease; background: var(--safe); }
+
+        .stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; }
+        .card-frame { background: var(--card); width: 100%; max-width: 420px; min-height: 380px; border-radius: 28px; border: 1px solid #333; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; text-align: center; transition: transform 0.1s, box-shadow 0.2s; }
+        .card-frame.CRISIS { border: 2px solid var(--danger); box-shadow: 0 0 50px rgba(255, 71, 87, 0.2); animation: shake 0.4s; }
+        .card-flavor { font-size: 1.25rem; line-height: 1.5; font-weight: 500; color: #eee; }
+        
+        @keyframes shake { 0% {transform: translateX(0)} 25% {transform: translateX(5px)} 50% {transform: translateX(-5px)} 100% {transform: translateX(0)} }
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px 20px 50px; background: #000; }
+        button { padding: 25px; border: none; border-radius: 16px; font-weight: 900; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; color: #fff; }
+        .btn-l { background: #1a1a1a; border: 1px solid #444; }
+        .btn-r { background: var(--accent); color: #000; }
+        .start-btn { grid-column: span 2; background: #fff; color: #000; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div id="t-display" style="font-weight: 900; font-size: 0.6rem; color: #555; letter-spacing: 2px;">TURN 0/500</div>
+    <div class="score" id="score">000000</div>
+</div>
+
+<div class="meters-grid">
+    <div class="meter-container"><div class="meter-label">Family</div><div class="meter-track"><div id="m-fam" class="meter-fill"></div></div></div>
+    <div class="meter-container"><div class="meter-label">Dept</div><div class="meter-track"><div id="m-dep" class="meter-fill"></div></div></div>
+    <div class="meter-container"><div class="meter-label">Health</div><div class="meter-track"><div id="m-hea" class="meter-fill"></div></div></div>
+    <div class="meter-container"><div class="meter-label">Public</div><div class="meter-track"><div id="m-pub" class="meter-fill"></div></div></div>
+</div>
+
+<div class="stage">
+    <div id="card-display" class="card-frame">
+        <p class="card-flavor" id="card-desc">WEIGHTED PULSE SYSTEM<br>SELECT START TO BEGIN SHIFT</p>
+    </div>
+</div>
+
+<div class="controls" id="control-panel">
+    <button class="start-btn" onclick="init()">START SHIFT</button>
+</div>
+
+<script>
+// --- UNIQUE HARDCODED DATABASE ---
+const POOL_ROUTINE = [
+    {d: "Shift change paperwork is piling up.", l: "Sign Off", r: "Ignore"},
+    {d: "The coffee machine has a weird hum.", l: "Unplug", r: "Clean"},
+    {d: "Janitor found a strange baggie in the lobby.", l: "Report", r: "Trash It"},
+    {d: "Internal memo: Budget for snacks is cut.", l: "Complain", r: "Accept"},
+    {d: "Light flicker in the server hallway.", l: "Call Maint.", r: "Ignore"},
+    {d: "A bird hit the window of the command center.", l: "Check Glass", r: "Ignore"},
+    {d: "Air conditioning is blowing too cold.", l: "Adjust", r: "Power Thru"}
+];
+
+const POOL_THREADS = [
+    {d: "MOLE: Unauthorized login on Terminal 4.", l: "Trace IP", r: "Kill Port"},
+    {d: "HEART: Courier 404 is stuck in heavy rain.", l: "Reroute", r: "Push Thru"},
+    {d: "FLOOD: Water depth at the levee is rising.", l: "Sandbag", r: "Open Sluice"},
+    {d: "ROOKIE: The trainee made a critical typo.", l: "Correct", r: "Scold"},
+    {d: "SARAH: Wind speeds hitting 85mph.", l: "Seal Vents", r: "Reinforce"}
+];
+
+const POOL_CRISIS = [
+    {d: "CRITICAL: GRID BLACKOUT - MOLE ACTIVE!", l: "Hard Reset", r: "Bypass"},
+    {d: "CRITICAL: LEVEE BREACH AT SECTOR 4!", l: "Seal Zone", r: "Evacuate"},
+    {d: "CRITICAL: TRANSPORT CRASH - TEMP RISING!", l: "Rescue", r: "Remote Op"}
+];
+
+let game = { fam:100, dep:100, hea:100, pub:100, turn:0, active:false, deck:[] };
+
+function init() {
+    // Generate exactly 500 unique cards with weighted distribution
+    for(let i=0; i<500; i++) {
+        let rand = Math.random() * 100;
+        let card;
+        
+        if (rand < 5 && i > 20) { // 5% Crisis (only after turn 20)
+            card = {...POOL_CRISIS[i % POOL_CRISIS.length], type: 'C'};
+        } else if (rand < 15) { // 10% Thread Beats
+            card = {...POOL_THREADS[i % POOL_THREADS.length], type: 'P'};
+        } else { // 85% Routine Pulse
+            card = {...POOL_ROUTINE[i % POOL_ROUTINE.length], type: 'P'};
+        }
+        game.deck.push({...card, id: i+1});
+    }
+    
+    game.active = true;
+    document.getElementById('control-panel').innerHTML = `<button class="btn-l" onclick="step('L')">ACTION A</button><button class="btn-r" onclick="step('R')">ACTION B</button>`;
+    render(game.deck.shift());
+}
+
+function step(choice) {
+    if(!game.active) return;
+    
+    // Balanced Decay & Gain
+    if(choice === 'L') { game.fam += 6; game.hea -= 3; game.dep -= 2; }
+    else { game.dep += 6; game.pub += 3; game.hea -= 5; }
+
+    game.fam -= Math.random() * 8; 
+    game.dep -= Math.random() * 8;
+    game.hea -= Math.random() * 8;
+    game.pub -= Math.random() * 8;
+
+    game.turn++;
+    if(game.turn >= 500) return end("SHIFT COMPLETE");
+    render(game.deck.shift());
+}
+
+function render(c) {
+    document.getElementById('card-desc').innerText = c.d;
+    document.getElementById('card-display').className = c.type === 'C' ? "card-frame CRISIS" : "card-frame";
+    document.getElementById('score').innerText = (game.turn * 100).toString().padStart(6, '0');
+    document.getElementById('t-display').innerText = `TURN ${game.turn}/500 [ID:${c.id}]`;
+
+    ['fam', 'dep', 'hea', 'pub'].forEach(k => {
+        let val = Math.max(0, Math.min(100, game[k]));
+        let bar = document.getElementById('m-' + k);
+        bar.style.width = val + "%";
+        bar.style.background = val < 25 ? "var(--danger)" : (val < 60 ? "#f1c40f" : "var(--safe)");
+        if(val <= 0) end("SYSTEM COLLAPSE: " + k.toUpperCase());
+    });
+}
+
+function end(m) {
+    game.active = false;
+    document.getElementById('card-desc').innerText = m;
+    document.getElementById('control-panel').innerHTML = `<button class="start-btn" onclick="location.reload()">RESTART</button>`;
+}
+</script>
+</body>
+</html>
