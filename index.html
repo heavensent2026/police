@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PULSE</title>
+    <style>
+        :root { --danger: #ff4757; --safe: #2ed573; --bg: #050505; --card: #121212; --accent: #3498db; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { background: #000; padding: 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .score { font-family: monospace; color: var(--accent); font-weight: bold; font-size: 1.2rem; }
+        .meters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; background: #0a0a0a; border-bottom: 2px solid #1a1a1a; }
+        .meter-container { display: flex; flex-direction: column; gap: 4px; }
+        .meter-label { font-size: 0.55rem; text-transform: uppercase; color: #666; font-weight: 800; }
+        .meter-track { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
+        .meter-fill { height: 100%; width: 100%; transition: width 0.4s ease, background 0.3s; }
+        .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .card-frame { background: var(--card); width: 100%; max-width: 400px; min-height: 320px; border-radius: 16px; border: 1px solid #252525; padding: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        .card-frame.CRISIS { border: 2px solid var(--danger); box-shadow: 0 0 40px rgba(255, 71, 87, 0.2); }
+        .card-flavor { font-size: 1.1rem; color: #eee; line-height: 1.5; font-weight: 500; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px 20px 40px 20px; background: #000; min-height: 140px; }
+        button { padding: 18px; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; font-size: 0.7rem; color: #fff; transition: 0.1s; }
+        .btn-l { background: #1a1a1a; border: 1px solid #333; }
+        .btn-r { background: var(--accent); color: #000; }
+        .full-btn { grid-column: span 2; background: var(--accent); color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="font-weight: 900; font-size: 0.6rem; color: #444; letter-spacing: 2px;">PULSE: 500_STORY_SYNC</div>
+    <div class="score" id="score">000000</div>
+</div>
+
+<div class="meters-grid" id="meters">
+    <div class="meter-container"><span class="meter-label">Family</span><div class="meter-track"><div id="m-fam" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Dept</span><div class="meter-track"><div id="m-dep" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Health</span><div class="meter-track"><div id="m-hea" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Public</span><div class="meter-track"><div id="m-pub" class="meter-fill" style="width:100%"></div></div></div>
+</div>
+
+<div class="stage">
+    <div id="card-display" class="card-frame">
+        <p class="card-flavor" id="card-desc">Shift Standby. All 500 chronological events verified.</p>
+    </div>
+</div>
+
+<div class="controls" id="control-panel">
+    <button class="full-btn" onclick="startGame()">START SHIFT</button>
+</div>
+
+<script>
+// --- CHRONOLOGICAL STORY DATA ---
+const RAW_THREADS = [
+    { n: "WHITEOUT", 
+      p: [ {d:"Ice builds on sensors.", l:"Manual Thaw", r:"Internal Heat"}, {d:"Intake vents are icing over.", l:"Chip Ice", r:"Air Blast"}, {d:"Structure is groaning under snow.", l:"Clear Roof", r:"Check Braces"} ],
+      c: [ {d:"REACTOR FREEZE: Power failing!", l:"Emergency Steam", r:"Hard Reset"}, {d:"ROOF BREACH: Snow inward!", l:"Seal Zone", r:"Evac Floor"} ]
+    },
+    { n: "THE MOLE", 
+      p: [ {d:"Unauthorized login detected.", l:"Track IP", r:"Lock Port"}, {d:"Suspicious memo found.", l:"Report IA", r:"Hide File"}, {d:"Keycard cloned at front gate.", l:"Alert Security", r:"Bait Entry"} ],
+      c: [ {d:"DATA WIPE: Files deleting!", l:"Pull Server", r:"Force Backup"}, {d:"IA AMBUSH: You are cornered.", l:"Cooperate", r:"Resist"} ]
+    },
+    { n: "GREAT FLOOD", 
+      p: [ {d:"Levee vibration detected.", l:"Sandbag", r:"Reinforce"}, {d:"Lower decks are damp.", l:"Pumps On", r:"Check Seals"}, {d:"River bypass is jammed.", l:"Unclog", r:"Divert"} ],
+      c: [ {d:"LEVEE BREACH: Wall gone!", l:"Sound Alarm", r:"Seal Sector"}, {d:"PUMP EXPLOSION: Flooding fast!", l:"Manual Patch", r:"Abandon Deck"} ]
+    },
+    { n: "HEART RUN", 
+      p: [ {d:"Courier stuck in traffic.", l:"Police Escort", r:"Reroute"}, {d:"Cooler battery flickering.", l:"Swap Power", r:"Stabilize"}, {d:"Hospital crowd is blocking entry.", l:"Clear Path", r:"Back Entrance"} ],
+      c: [ {d:"ORGAN FAILURE: Temp spike!", l:"Ice Bath", r:"Direct Inject"}, {d:"CRASH: Transport hit!", l:"Rescue Mission", r:"Emergency Swap"} ]
+    }
+];
+
+let decks = { P: [], C: [], active: false };
+let game = { fam: 100, dep: 100, hea: 100, pub: 100, lapse: 0, score: 0, turn: 0 };
+
+function build500() {
+    // Generate 300 Pulse
+    for(let i=0; i<300; i++) {
+        let t = RAW_THREADS[i % RAW_THREADS.length];
+        let b = t.p[Math.floor(i / RAW_THREADS.length) % t.p.length];
+        decks.P.push({ d: `${t.n}: ${b.d}`, l: b.l, r: b.r, isC: false });
+    }
+    // Generate 200 Crisis
+    for(let i=0; i<200; i++) {
+        let t = RAW_THREADS[i % RAW_THREADS.length];
+        let b = t.c[Math.floor(i / RAW_THREADS.length) % t.c.length];
+        decks.C.push({ d: `CRITICAL ${t.n}: ${b.d}`, l: b.l, r: b.r, isC: true });
+    }
+}
+
+function startGame() {
+    build500();
+    decks.active = true;
+    document.getElementById('control-panel').innerHTML = `
+        <button id="btn-left" class="btn-l" onclick="turn('L')"></button>
+        <button id="btn-right" class="btn-r" onclick="turn('R')"></button>
+    `;
+    turn('INIT');
+}
+
+function turn(choice) {
+    if (!decks.active) return;
+
+    if (choice === 'L') {
+        game.lapse += (9 + (game.turn * 0.15));
+        game.fam = Math.min(100, game.fam + 2);
+        game.hea -= 2;
+    } else if (choice === 'R') {
+        game.lapse = Math.max(0, game.lapse - 20);
+        game.dep -= 5;
+        game.pub -= 4;
+        game.hea -= 4;
+    }
+
+    let isC = (Math.random() * 100 < game.lapse && decks.C.length > 0);
+    let card = isC ? decks.C.shift() : decks.P.shift();
+
+    if (isC) game.lapse = 0;
+    if (choice !== 'INIT') { game.turn++; game.score += 100; }
+
+    const mult = isC ? 25 : 6;
+    game.fam -= Math.random() * mult; game.dep -= Math.random() * mult;
+    game.hea -= Math.random() * mult; game.pub -= Math.random() * mult;
+
+    render(card);
+}
+
+function render(card) {
+    if(!card) return;
+    document.getElementById('card-desc').innerText = card.d;
+    document.getElementById('btn-left').innerText = card.l;
+    document.getElementById('btn-right').innerText = card.r;
+    document.getElementById('card-display').className = card.isC ? "card-frame CRISIS" : "card-frame";
+    document.getElementById('score').innerText = game.score.toString().padStart(6, '0');
+    
+    ['fam', 'dep', 'hea', 'pub'].forEach(k => {
+        let v = Math.max(0, game[k]);
+        let el = document.getElementById('m-' + k);
+        el.style.width = v + "%";
+        el.style.background = v < 30 ? "var(--danger)" : (v < 60 ? "#f1c40f" : "var(--safe)");
+    });
+
+    if (game.fam <= 0 || game.dep <= 0 || game.hea <= 0 || game.pub <= 0) {
+        decks.active = false;
+        document.getElementById('card-desc').innerText = "FATAL STABILITY COLLAPSE.";
+        document.getElementById('control-panel').innerHTML = `<button class="full-btn" onclick="location.reload()">RESTART</button>`;
+    }
+}
+</script>
+</body>
+</html>
