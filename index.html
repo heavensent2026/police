@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PULSE</title>
+    <style>
+        :root { --danger: #ff4757; --safe: #2ed573; --bg: #050505; --card: #121212; --accent: #3498db; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { background: #000; padding: 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .score { font-family: monospace; color: var(--accent); font-weight: bold; font-size: 1.2rem; }
+        .meters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; background: #0a0a0a; border-bottom: 2px solid #1a1a1a; }
+        .meter-container { display: flex; flex-direction: column; gap: 4px; }
+        .meter-label { font-size: 0.55rem; text-transform: uppercase; color: #666; font-weight: 800; }
+        .meter-track { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
+        .meter-fill { height: 100%; width: 100%; transition: width 0.4s ease, background 0.3s; }
+        .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+        .card-frame { background: var(--card); width: 100%; max-width: 400px; min-height: 280px; border-radius: 16px; border: 1px solid #252525; padding: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        .card-frame.CRISIS { border: 2px solid var(--danger); box-shadow: 0 0 30px rgba(255, 71, 87, 0.15); }
+        .card-flavor { font-size: 1.1rem; color: #eee; line-height: 1.5; font-weight: 500; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px 20px 40px 20px; background: #000; min-height: 120px; }
+        button { padding: 20px; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; color: #fff; }
+        .btn-l { background: #1a1a1a; border: 1px solid #333; }
+        .btn-r { background: var(--accent); color: #000; }
+        .full-btn { grid-column: span 2; background: var(--accent); color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="font-weight: 900; font-size: 0.7rem; color: #444; letter-spacing: 2px;">PULSE: CHRONO_V9</div>
+    <div class="score" id="score">000000</div>
+</div>
+
+<div class="meters-grid">
+    <div class="meter-container"><span class="meter-label">Family</span><div class="meter-track"><div id="m-fam" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Dept</span><div class="meter-track"><div id="m-dep" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Health</span><div class="meter-track"><div id="m-hea" class="meter-fill" style="width:100%"></div></div></div>
+    <div class="meter-container"><span class="meter-label">Public</span><div class="meter-track"><div id="m-pub" class="meter-fill" style="width:100%"></div></div></div>
+</div>
+
+<div class="stage">
+    <div id="card-display" class="card-frame">
+        <p class="card-flavor" id="card-desc">Shift Ready. Narrative Order Synced.</p>
+    </div>
+</div>
+
+<div class="controls" id="control-panel">
+    <button class="full-btn" onclick="startShift()">START SHIFT</button>
+</div>
+
+<script>
+// --- CHRONOLOGICAL STORY DATA ---
+const PULSE_STORY = [
+    { d: "WHITEOUT [Phase 1]: Frost begins to glaze the exterior sensors.", l: "Manual Wipe", r: "Internal Heat" },
+    { d: "MOLE [Phase 1]: You notice a discrepancy in the daily access logs.", l: "Flag Entry", r: "Ignore Quietly" },
+    { d: "FLOOD [Phase 1]: The river is touching the base of the levee.", l: "Check Seals", r: "Divert Pumps" },
+    { d: "WHITEOUT [Phase 2]: Visibility drops. A supply truck is stalled outside.", l: "Launch Flare", r: "Radio Guide" },
+    { d: "MOLE [Phase 2]: Your private terminal shows a failed login attempt.", l: "Change Pass", r: "Bait Trap" },
+    { d: "FLOOD [Phase 2]: Water is seeping through the basement vents.", l: "Sump Pump", r: "Seal Vents" }
+];
+
+const CRISIS_STORY = [
+    { d: "CRITICAL: The levee wall has cracked! Flash flood incoming.", l: "Sound Alarm", r: "Emergency Dam" },
+    { d: "CRITICAL: The Mole has locked you out of the main grid!", l: "Hardware Reset", r: "Kill Power" },
+    { d: "CRITICAL: The Whiteout has frozen the backup generator!", l: "Apply Torch", r: "Bypass Link" }
+];
+
+let decks = {
+    P: [...PULSE_STORY],
+    C: [...CRISIS_STORY],
+    active: false
+};
+
+let game = { fam: 100, dep: 100, hea: 100, pub: 100, lapse: 0, score: 0, turn: 0 };
+
+function startShift() {
+    decks.active = true;
+    document.getElementById('control-panel').innerHTML = `
+        <button id="btn-left" class="btn-l" onclick="step('L')"></button>
+        <button id="btn-right" class="btn-r" onclick="step('R')"></button>
+    `;
+    step('INIT');
+}
+
+function step(choice) {
+    if (!decks.active) return;
+
+    if (choice === 'L') {
+        game.lapse += (8 + (game.turn * 0.1));
+        game.fam = Math.min(100, game.fam + 3);
+        game.hea -= 3;
+    } else if (choice === 'R') {
+        game.lapse = Math.max(0, game.lapse - 18);
+        game.dep -= 5;
+        game.pub -= 4;
+        game.hea -= 4;
+    }
+
+    // Determine type, but ALWAYS take the next card in line
+    let isC = (Math.random() * 100 < game.lapse);
+    let card;
+
+    if (isC && decks.C.length > 0) {
+        card = decks.C.shift(); // Remove from FRONT of Crisis line
+        game.lapse = 0;
+    } else {
+        if (decks.P.length === 0) { 
+            // Loop Pulse only if finished, but keep story order
+            decks.P = [...PULSE_STORY]; 
+        }
+        card = decks.P.shift(); // Remove from FRONT of Pulse line
+    }
+
+    const m = isC ? 25 : 5;
+    game.fam -= Math.random() * m; game.dep -= Math.random() * m;
+    game.hea -= Math.random() * m; game.pub -= Math.random() * m;
+
+    if (choice !== 'INIT') { game.turn++; game.score += 100; }
+    render(card, isC);
+}
+
+function render(card, isC) {
+    document.getElementById('card-desc').innerText = card.d;
+    document.getElementById('btn-left').innerText = card.l;
+    document.getElementById('btn-right').innerText = card.r;
+    document.getElementById('card-display').className = isC ? "card-frame CRISIS" : "card-frame";
+    document.getElementById('score').innerText = game.score.toString().padStart(6, '0');
+    
+    ['fam', 'dep', 'hea', 'pub'].forEach(k => {
+        let v = Math.max(0, game[k]);
+        let el = document.getElementById('m-' + k);
+        el.style.width = v + "%";
+        el.style.background = v < 30 ? "var(--danger)" : (v < 60 ? "#f1c40f" : "var(--safe)");
+    });
+
+    if (game.fam <= 0 || game.dep <= 0 || game.hea <= 0 || game.pub <= 0) {
+        decks.active = false;
+        document.getElementById('card-desc').innerText = "STABILITY TERMINATED.";
+        document.getElementById('control-panel').innerHTML = `<button class="full-btn" onclick="location.reload()">RESTART</button>`;
+    }
+}
+</script>
+</body>
+</html>
