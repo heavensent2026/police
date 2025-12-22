@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chief: Forever Sim</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --neon: #00ffcc; --bg: #050a0f; --danger: #ff4444; --warn: #ffcc00; }
+        body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; user-select: none; }
+        #game-shell { width: 90%; max-width: 420px; border: 2px solid var(--neon); padding: 25px; position: relative; background: rgba(0,20,30,0.9); box-shadow: 0 0 30px rgba(0,255,204,0.1); }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-unit { font-size: 11px; letter-spacing: 1px; }
+        .bar { background: #111; height: 6px; width: 100%; border: 1px solid #222; margin-top: 5px; }
+        .fill { background: var(--neon); height: 100%; transition: width 0.6s cubic-bezier(0.2, 1, 0.3, 1); }
+        .fill.danger { background: var(--danger); }
+        #card-display { height: 260px; text-align: center; border-top: 1px solid #1a3a3a; padding-top: 20px; display: flex; flex-direction: column; justify-content: center; }
+        #speaker-name { font-size: 0.8rem; color: var(--warn); text-transform: uppercase; margin-bottom: 5px; }
+        #scenario-text { font-size: 1.1rem; line-height: 1.4; color: #fff; }
+        #controls { display: flex; gap: 15px; margin-top: 30px; }
+        button { flex: 1; background: transparent; color: var(--neon); border: 1px solid var(--neon); padding: 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: 'Courier New'; }
+        button:active { background: var(--neon); color: var(--bg); }
+        #metadata { display: flex; justify-content: space-between; margin-top: 20px; font-size: 10px; opacity: 0.6; border-top: 1px solid #1a3a3a; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="game-shell">
+    <div class="stats-grid">
+        <div class="stat-unit">DEPT <div class="bar"><div id="dept-fill" class="fill"></div></div></div>
+        <div class="stat-unit">HEALTH <div class="bar"><div id="health-fill" class="fill"></div></div></div>
+        <div class="stat-unit">PUBLIC <div class="bar"><div id="public-fill" class="fill"></div></div></div>
+        <div class="stat-unit">FAMILY <div class="bar"><div id="family-fill" class="fill"></div></div></div>
+    </div>
+
+    <div id="card-display">
+        <div id="speaker-name">SYSTEM READY</div>
+        <div id="scenario-text">Awaiting Dispatch...</div>
+    </div>
+
+    <div id="controls">
+        <button onclick="engine.makeChoice('A')" id="btn-a">---</button>
+        <button onclick="engine.makeChoice('B')" id="btn-b">---</button>
+    </div>
+
+    <div id="metadata">
+        <div id="chief-id">ID: #001</div>
+        <div id="day-counter">DAY: 1</div>
+    </div>
+</div>
+
+<script>
+class ForeverEngine {
+    constructor() {
+        this.state = JSON.parse(localStorage.getItem('police_forever_v3')) || {
+            stats: { dept: 50, health: 50, public: 50, family: 50 },
+            day: 1, chiefCount: 1
+        };
+        
+        this.subjects = ["Sgt. Miller", "The Mayor", "Officer Riggs", "A Citizen", "Your Spouse", "The Union", "Reporter Vane", "A Lawyer", "Dispatch"];
+        this.templates = [];
+        this.buildFactory();
+        this.nextTurn();
+    }
+
+    buildFactory() {
+        const categories = [
+            {
+                actions: ["reports a shootout", "found drug stashes", "is chasing suspects", "witnessed a mugging", "reports a street race", "needs backup for a raid", "is handling a riot"],
+                locs: ["the Docks", "the Metro", "the Industrial Zone", "the Slums", "the Subway", "Central Park"],
+                A: { l: "Deploy", e: { dept: -5, public: 8, health: -7, family: 0 } },
+                B: { l: "Stand Down", e: { dept: 5, public: -12, health: 3, family: 0 } }
+            },
+            {
+                actions: ["offers a bribe", "suggests burying evidence", "wants a favor", "is asking for a 'donation'", "wants to drop charges", "is leaking info"],
+                locs: ["City Hall", "a private club", "the Precinct", "the Casino", "an alleyway", "the Court"],
+                A: { l: "Accept", e: { dept: 12, public: -18, health: -2, family: 8 } },
+                B: { l: "Refuse", e: { dept: -8, public: 12, health: -4, family: -4 } }
+            },
+            {
+                actions: ["is complaining about your hours", "needs money for tuition", "wants a family vacation", "is sick and needs you", "reminds you of an anniversary"],
+                locs: ["Home", "the Hospital", "the School", "a Restaurant", "the Airport"],
+                A: { l: "Prioritize", e: { family: 18, health: 8, dept: -12, public: 0 } },
+                B: { l: "Work First", e: { family: -22, health: -8, dept: 12, public: 3 } }
+            },
+            {
+                actions: ["is auditing the files", "demands a statement", "is cutting the budget", "is filing a lawsuit", "demands body cams", "wants more transparency"],
+                locs: ["The Court", "the Precinct", "the Media Hub", "the Capital", "a Press Conference"],
+                A: { l: "Comply", e: { dept: -12, public: 15, health: -8, family: 0 } },
+                B: { l: "Resist", e: { dept: 10, public: -20, health: -5, family: 0 } }
+            }
+        ];
+
+        categories.forEach(cat => {
+            cat.actions.forEach(act => {
+                cat.locs.forEach(loc => {
+                    this.templates.push({ t: `[Sub] ${act} at ${loc}.`, A: cat.A, B: cat.B });
+                });
+            });
+        });
+    }
+
+    generateCard() {
+        const base = this.templates[Math.floor(Math.random() * this.templates.length)];
+        const sub = this.subjects[Math.floor(Math.random() * this.subjects.length)];
+        return { speaker: sub, text: base.t.replace("[Sub]", sub), choiceA: base.A, choiceB: base.B };
+    }
+
+    makeChoice(side) {
+        const choice = side === 'A' ? this.currentCard.choiceA : this.currentCard.choiceB;
+        const mod = 1 + (Math.floor(this.state.day / 50) * 0.1); // Progressive difficulty
+
+        for (let s in choice.e) {
+            this.state.stats[s] += (choice.e[s] * mod);
+            this.state.stats[s] = Math.max(0, Math.min(100, this.state.stats[s]));
+        }
+
+        this.state.day++;
+        this.checkDeath();
+        this.save();
+        this.nextTurn();
+    }
+
+    checkDeath() {
+        for (let s in this.state.stats) {
+            if (this.state.stats[s] <= 0 || this.state.stats[s] >= 100) {
+                alert(`CHIEF #${this.state.chiefCount} TERMINATED.\nSurvived ${this.state.day} Days.\nCause: ${s.toUpperCase()}`);
+                this.state.chiefCount++;
+                this.state.day = 1;
+                this.state.stats = { dept: 50, health: 50, public: 50, family: 50 };
+                break;
+            }
+        }
+    }
+
+    save() { localStorage.setItem('police_forever_v3', JSON.stringify(this.state)); }
+
+    render() {
+        for (let s in this.state.stats) {
+            const fill = document.getElementById(`${s}-fill`);
+            fill.style.width = `${this.state.stats[s]}%`;
+            fill.classList.toggle('danger', this.state.stats[s] < 20 || this.state.stats[s] > 80);
+        }
+        document.getElementById('day-counter').innerText = `DAY: ${this.state.day}`;
+        document.getElementById('chief-id').innerText = `ID: #${String(this.state.chiefCount).padStart(3, '0')}`;
+    }
+
+    nextTurn() {
+        this.currentCard = this.generateCard();
+        document.getElementById('speaker-name').innerText = this.currentCard.speaker;
+        document.getElementById('scenario-text').innerText = this.currentCard.text;
+        document.getElementById('btn-a').innerText = this.currentCard.choiceA.l;
+        document.getElementById('btn-b').innerText = this.currentCard.choiceB.l;
+        this.render();
+    }
+}
+const engine = new ForeverEngine();
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
