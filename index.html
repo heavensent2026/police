@@ -1,0 +1,1380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Traffic Team — Offline PWA</title>
+  <meta name="theme-color" content="#0b0f1a" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root{
+      --bg:#0b0f1a; --panel:#111a2b; --ink:#eaf1ff; --muted:#94a4c7;
+      --barbg:#1b2742; --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 40% -10%, #15254a 0%, var(--bg) 55%);
+      color:var(--ink);
+      min-height:100vh;
+      display:flex; align-items:center; justify-content:center;
+      padding:18px;
+    }
+    .app{
+      width:min(980px, 100%);
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      gap:14px;
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px;
+    }
+    .brand{display:flex; flex-direction:column; gap:2px;}
+    .brand .title{font-weight:800; letter-spacing:.4px}
+    .brand .sub{color:var(--muted); font-size:13px}
+    .meta{
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+      color:var(--muted); font-size:13px;
+    }
+    .pill{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      padding:6px 10px;
+      border-radius:999px;
+      backdrop-filter: blur(8px);
+    }
+
+    .stats{
+      background: rgba(17,26,43,.7);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: var(--radius);
+      padding:12px 12px 10px;
+      box-shadow: var(--shadow);
+    }
+    .statrow{
+      display:grid;
+      grid-template-columns: 110px 1fr 44px;
+      gap:10px;
+      align-items:center;
+      margin:6px 0;
+    }
+    .label{font-size:12px; color:var(--muted); letter-spacing:.6px; text-transform:uppercase}
+    .bar{
+      height:12px;
+      background: var(--barbg);
+      border-radius:999px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .fill{
+      height:100%;
+      width:50%;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(106,168,255,.95), rgba(91,255,177,.85));
+      transition: width .25s ease;
+    }
+    .fill.heat{
+      background: linear-gradient(90deg, rgba(255,92,122,.75), rgba(255,196,92,.85));
+    }
+    .value{
+      font-variant-numeric: tabular-nums;
+      text-align:right;
+      color: rgba(234,241,255,.85);
+      font-size:13px;
+    }
+
+    .card{
+      background: rgba(17,26,43,.78);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: calc(var(--radius) + 6px);
+      padding: 20px 18px;
+      box-shadow: var(--shadow);
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      min-height: 340px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card:before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(700px 260px at 20% 0%, rgba(106,168,255,.22), transparent 60%),
+                  radial-gradient(700px 260px at 80% 20%, rgba(255,92,122,.14), transparent 60%);
+      pointer-events:none;
+      opacity:.9;
+    }
+    .card > *{position:relative}
+    .scene{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .scene strong{color:rgba(234,241,255,.88)}
+    .prompt{
+      font-size: clamp(18px, 2.4vw, 26px);
+      line-height:1.25;
+      font-weight:750;
+      letter-spacing:.2px;
+      padding: 6px 2px 0;
+    }
+    .hint{
+      color: var(--muted);
+      font-size:13px;
+      line-height:1.35;
+      margin-top:-2px;
+    }
+    .choices{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      margin-top:auto;
+    }
+    button{
+      appearance:none;
+      border:none;
+      border-radius: 16px;
+      padding: 14px 14px;
+      font-weight:700;
+      font-size:15px;
+      color:var(--ink);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      cursor:pointer;
+      transition: transform .08s ease, background .12s ease, border-color .12s ease;
+      min-height:56px;
+    }
+    button:active{transform: translateY(1px) scale(.99)}
+    .left:hover{background: rgba(91,255,177,.10); border-color: rgba(91,255,177,.25)}
+    .right:hover{background: rgba(255,92,122,.10); border-color: rgba(255,92,122,.25)}
+    .footer{
+      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+      color:var(--muted); font-size:13px;
+    }
+    .footer .actions{display:flex; gap:8px; flex-wrap:wrap}
+    .linkbtn{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      color: rgba(234,241,255,.90);
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-weight:700;
+      font-size:13px;
+      cursor:pointer;
+    }
+    .toast{
+      position:fixed;
+      bottom:16px; left:50%;
+      transform: translateX(-50%);
+      background: rgba(10,14,26,.9);
+      border:1px solid rgba(255,255,255,.14);
+      color: rgba(234,241,255,.92);
+      padding: 10px 12px;
+      border-radius: 999px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.5);
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .2s ease, transform .2s ease;
+      font-size:13px;
+      backdrop-filter: blur(10px);
+      max-width:min(720px, 92vw);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .toast.show{opacity:1; transform: translateX(-50%) translateY(-2px)}
+    @media (max-width: 680px){
+      .statrow{grid-template-columns: 98px 1fr 42px}
+      .choices{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="title">Traffic Team</div>
+        <div class="sub">Offline PWA • pursuits • zones • persistent cases</div>
+      </div>
+      <div class="meta">
+        <div class="pill" id="pillTime">—</div>
+        <div class="pill" id="pillZone">—</div>
+        <div class="pill" id="pillShift">—</div>
+      </div>
+    </header>
+
+    <section class="stats" aria-label="Stats">
+      <div class="statrow">
+        <div class="label">Public</div>
+        <div class="bar"><div class="fill" id="barPublic"></div></div>
+        <div class="value" id="valPublic">50</div>
+      </div>
+      <div class="statrow">
+        <div class="label">Department</div>
+        <div class="bar"><div class="fill" id="barDept"></div></div>
+        <div class="value" id="valDept">50</div>
+      </div>
+      <div class="statrow">
+        <div class="label">Health</div>
+        <div class="bar"><div class="fill" id="barHealth"></div></div>
+        <div class="value" id="valHealth">50</div>
+      </div>
+      <div class="statrow">
+        <div class="label">Heat</div>
+        <div class="bar"><div class="fill heat" id="barHeat"></div></div>
+        <div class="value" id="valHeat">50</div>
+      </div>
+    </section>
+
+    <main class="card" aria-live="polite">
+      <div class="scene">
+        <div><strong id="sceneLine">—</strong></div>
+        <div id="streakLine">—</div>
+      </div>
+      <div class="prompt" id="prompt">Loading…</div>
+      <div class="hint" id="hint">Two choices. The street remembers.</div>
+      <div class="choices">
+        <button class="left" id="btnLeft">—</button>
+        <button class="right" id="btnRight">—</button>
+      </div>
+    </main>
+
+    <div class="footer">
+      <div id="footerLine">—</div>
+      <div class="actions">
+        <button class="linkbtn" id="btnSave">Save</button>
+        <button class="linkbtn" id="btnNew">New Run</button>
+        <button class="linkbtn" id="btnExport">Export Save</button>
+        <button class="linkbtn" id="btnImport">Import Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">—</div>
+
+<script>
+(() => {
+  // ----------------- utils -----------------
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const nowISO = () => new Date().toISOString();
+
+  function mulberry32(seed){
+    let t = seed >>> 0;
+    return function(){
+      t += 0x6D2B79F5;
+      let x = Math.imul(t ^ (t >>> 15), 1 | t);
+      x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pick(arr, r){ return arr[Math.floor(r() * arr.length)]; }
+  function fmt(tpl, ctx){
+    return tpl.replace(/\{(\w+)\}/g, (_, k) => (ctx && ctx[k] != null) ? String(ctx[k]) : `{${k}}`);
+  }
+  function chance(rng, p){ return rng() < p; }
+
+  // ----------------- zones -----------------
+  const ZONES_DAY = ["US-17","Mount Pleasant","West Ashley","Summerville","I-26","I-526","North Charleston"];
+  const ZONES_NIGHT = ["I-26","I-526","US-17","North Charleston","West Ashley"];
+
+  // Zone profiles: multipliers by topic + some key overrides.
+  // This is what makes I-26 feel like I-26 and Mount Pleasant feel like Mount Pleasant.
+  const ZONE_PROFILES = {
+    "I-26": {
+      topicMult: { radar:1.40, reckless:1.35, dui:1.25, crash:1.25, pursuit:1.20, community:0.70, admin:0.85 },
+      keyMult:   { school_zone:0.40, crowd_stop:0.70, livestream:0.70, construction:1.20 }
+    },
+    "I-526": {
+      topicMult: { radar:1.35, reckless:1.30, dui:1.20, crash:1.20, pursuit:1.15, community:0.75, admin:0.90 },
+      keyMult:   { road_hazard:1.30, construction:1.25, motorcycle:1.25 }
+    },
+    "US-17": {
+      topicMult: { radar:1.20, stop:1.15, dui:1.10, crash:1.05, community:1.00, admin:0.95, pursuit:0.95, reckless:1.05 },
+      keyMult:   { illegal_tint:1.20, no_plate:1.15, move_over:1.10 }
+    },
+    "Mount Pleasant": {
+      topicMult: { community:1.35, stop:1.15, admin:1.05, radar:0.95, reckless:0.80, pursuit:0.65, crash:0.85, dui:0.90 },
+      keyMult:   { school_zone:1.40, illegal_tint:1.25, livestream:1.20, vip_name_drop:1.20 }
+    },
+    "Summerville": {
+      topicMult: { stop:1.20, crash:1.10, community:1.05, radar:1.05, admin:0.95, reckless:0.95, pursuit:0.80, dui:1.00 },
+      keyMult:   { construction:1.20, school_zone:1.25, breakdown:1.15 }
+    },
+    "West Ashley": {
+      topicMult: { stop:1.20, community:1.10, dui:1.10, admin:1.05, radar:0.95, crash:1.00, reckless:0.95, pursuit:0.85 },
+      keyMult:   { crowd_stop:1.15, complaint:1.15 }
+    },
+    "North Charleston": {
+      topicMult: { stop:1.25, reckless:1.20, pursuit:1.20, admin:1.05, crash:1.05, dui:1.10, community:0.85, radar:1.05 },
+      keyMult:   { stolen_vehicle:1.25, warrant_hit:1.25, gun_found:1.20, street_racing:1.20 }
+    }
+  };
+
+  function zoneProfile(zone){
+    return ZONE_PROFILES[zone] || { topicMult:{}, keyMult:{} };
+  }
+
+  // ----------------- authored libraries -----------------
+  const VEHICLES = {
+    sedan: ["silver sedan","white Camry","black Altima","gray Accord","red compact"],
+    suv: ["dark SUV","white crossover","black Tahoe","gray Explorer","blue Jeep"],
+    truck: ["lifted truck","work truck","white pickup","black Ram","older F-150"],
+    bike: ["sport bike","loud cruiser","black motorcycle","red bike"],
+    van:  ["delivery van","white van","work van","old minivan"]
+  };
+
+  const DRIVER = {
+    vibe: ["nervous","angry","tired","overconfident","quiet","chatty","cold"],
+    hands: ["hands visible","hands low","one hand shaking","grip tight","fingers tapping"],
+    eyes: ["won’t look up","stares hard","blinks slow","eyes glassy","keeps checking mirrors"]
+  };
+
+  const WEATHER_DAY = ["humid heat","hard sunlight","thin overcast","light drizzle","windy gusts"];
+  const WEATHER_NIGHT = ["thin fog","black sky","wet pavement","cold air","quiet humidity"];
+
+  const DETAILS = {
+    speed: ["ten-over","twenty-over","way too fast","ripping past traffic","weaving at speed"],
+    dui: ["sour alcohol","strong cologne","empty energy drink","sweet smoke","mint trying to hide it"],
+    papers: ["insurance card","registration","license","work badge","stack of receipts"],
+    hazard: ["tire tread","ladder","cooler","trash bag","metal debris"]
+  };
+
+  const AFTERMATH = [
+    "Supervisor wants a clean timeline.",
+    "A citizen complaint arrives fast and loud.",
+    "Court date lands on your off day.",
+    "Body-cam review flags your tone.",
+    "Your partner asks if it was worth it."
+  ];
+
+  // ----------------- chain model -----------------
+  // Core chain stages: A -> B -> C -> D -> E (15 cards per chain per run: 5 stages × 3 variants)
+  // Pursuit is its own dedicated 8-stage chain (24 cards per run: 8 × 3 variants).
+  const CORE_STAGES = ["A","B","C","D","E"];
+  const PURSUIT_STAGES = ["P1","P2","P3","P4","P5","P6","P7","P8"];
+
+  const CHAIN_TYPES = [
+    // traffic core
+    {key:"speeding", topic:["radar","stop"], intensity:"mid"},
+    {key:"weaving", topic:["reckless","stop"], intensity:"mid"},
+    {key:"no_plate", topic:["stop"], intensity:"mid"},
+    {key:"illegal_tint", topic:["stop"], intensity:"mid"},
+    {key:"texting", topic:["stop"], intensity:"low"},
+    {key:"move_over", topic:["stop","community"], intensity:"mid"},
+    {key:"school_zone", topic:["community","stop"], intensity:"low"},
+    {key:"construction", topic:["stop"], intensity:"low"},
+    {key:"unsecured_load", topic:["stop"], intensity:"mid"},
+    {key:"commercial", topic:["stop","admin"], intensity:"mid"},
+    {key:"motorcycle", topic:["reckless","stop"], intensity:"high"},
+    {key:"street_racing", topic:["reckless","pursuit"], intensity:"high"},
+    // dui/night
+    {key:"dui_suspect", topic:["dui","stop"], intensity:"high", nightBias:true},
+    {key:"dui_checkpoint", topic:["dui","community"], intensity:"mid", nightBias:true},
+    // crashes/hazards
+    {key:"minor_crash", topic:["crash"], intensity:"mid"},
+    {key:"major_crash", topic:["crash","admin"], intensity:"high"},
+    {key:"road_hazard", topic:["crash"], intensity:"low"},
+    {key:"breakdown", topic:["community"], intensity:"low"},
+    // oversight/admin
+    {key:"complaint", topic:["admin","community"], intensity:"mid"},
+    {key:"numbers_pressure", topic:["admin"], intensity:"mid"},
+    {key:"equipment_fail", topic:["equipment","admin"], intensity:"low"},
+    // escalation hooks
+    {key:"warrant_hit", topic:["stop","admin"], intensity:"high"},
+    {key:"stolen_vehicle", topic:["stop","pursuit"], intensity:"high"},
+    {key:"gun_found", topic:["stop","admin"], intensity:"high"},
+    // community pressure
+    {key:"livestream", topic:["community"], intensity:"high"},
+    {key:"crowd_stop", topic:["community","stop"], intensity:"mid"},
+    {key:"vip_name_drop", topic:["admin"], intensity:"mid"},
+    // fatigue/health
+    {key:"near_miss", topic:["health","crash"], intensity:"high"},
+    {key:"injury", topic:["health","admin"], intensity:"mid"},
+    {key:"burnout", topic:["health","admin"], intensity:"mid"},
+
+    // persistent follow-up chains (scheduled across shifts)
+    {key:"court_followup", topic:["admin","court"], intensity:"mid"},
+    {key:"ia_review", topic:["admin","community"], intensity:"mid"},
+    {key:"repeat_offender", topic:["stop","reckless"], intensity:"mid"},
+
+    // dedicated pursuit chain
+    {key:"pursuit", topic:["pursuit","reckless"], intensity:"high", nightBias:true, isPursuit:true},
+  ];
+
+  function getChain(key){
+    return CHAIN_TYPES.find(c => c.key === key) || CHAIN_TYPES[0];
+  }
+
+  // ----------------- effects (punchy) -----------------
+  const FX = {
+    warn:   {public:+2, dept:-1, heat:-1, health:+0},
+    cite:   {public:-1, dept:+2, heat:+1, health:+0},
+    search: {public:-2, dept:+2, heat:+2, health:-1},
+    arrest: {public:+0, dept:+3, heat:+2, health:-1},
+    calm:   {public:+2, dept:-1, heat:-2, health:+0},
+    hard:   {public:-2, dept:+2, heat:+2, health:-1},
+    safe:   {public:+1, dept:-1, heat:-2, health:+0},
+    chase:  {public:-2, dept:+2, heat:+3, health:-2},
+    paper:  {public:+0, dept:+2, heat:+1, health:-1},
+    shortcut:{public:-1, dept:-2, heat:+2, health:+0},
+    rest:   {public:+0, dept:-1, heat:-2, health:+2},
+    push:   {public:-1, dept:+2, heat:+2, health:-2},
+  };
+
+  // ----------------- persistent subjects (repeat offenders) -----------------
+  // We keep a small pool of "subjects" so some encounters recur later.
+  function pickVehicleForChain(chainKey, rng){
+    let cls = "sedan";
+    if(["commercial","unsecured_load"].includes(chainKey)) cls = "truck";
+    if(["motorcycle"].includes(chainKey)) cls = "bike";
+    if(["street_racing"].includes(chainKey)) cls = pick(["sedan","suv","truck"], rng);
+    if(["breakdown","minor_crash","major_crash"].includes(chainKey)) cls = pick(["sedan","suv","van"], rng);
+    if(["pursuit"].includes(chainKey)) cls = pick(["sedan","suv","truck","bike"], rng);
+    return pick(VEHICLES[cls], rng);
+  }
+
+  function makeCtx(chainKey, S, rng, opts={}){
+    const isNight = S.isNight;
+    const weather = isNight ? pick(WEATHER_NIGHT, rng) : pick(WEATHER_DAY, rng);
+
+    // subject: sometimes reuse an existing one to create a repeat offender / ongoing thread
+    let subjectId = null;
+    let vehicle = null;
+    let isRepeat = false;
+
+    if(opts.forceSubjectId != null){
+      subjectId = opts.forceSubjectId;
+      const subj = S.subjects.find(x => x.id === subjectId);
+      if(subj){ vehicle = subj.vehicle; isRepeat = true; }
+    } else if(S.subjects.length && chance(rng, (S.heat >= 55 ? 0.30 : 0.18))){
+      const subj = pick(S.subjects, rng);
+      subjectId = subj.id;
+      vehicle = subj.vehicle;
+      isRepeat = true;
+    }
+
+    if(vehicle == null){
+      vehicle = pickVehicleForChain(chainKey, rng);
+      subjectId = ++S.subjectSeq;
+      S.subjects.unshift({id:subjectId, vehicle, seen:0});
+      S.subjects = S.subjects.slice(0, 10);
+    }
+
+    // update seen counts
+    for(const s of S.subjects) s.seen += 1;
+    const subjNow = S.subjects.find(x => x.id === subjectId);
+    if(subjNow) subjNow.seen = 0;
+
+    const vibe = pick(DRIVER.vibe, rng);
+    const hands = pick(DRIVER.hands, rng);
+    const eyes = pick(DRIVER.eyes, rng);
+
+    return {
+      chainKey,
+      zone: S.zone,
+      isNight,
+      vehicle,
+      weather,
+      vibe,
+      hands,
+      eyes,
+      speed: pick(DETAILS.speed, rng),
+      odor: pick(DETAILS.dui, rng),
+      paper: pick(DETAILS.papers, rng),
+      hazard: pick(DETAILS.hazard, rng),
+      aftermath: pick(AFTERMATH, rng),
+      subjectId,
+      isRepeat
+    };
+  }
+
+  // ----------------- stage builder -----------------
+  function buildPursuitStage(stage, v, ctx){
+    const baseTag = ["pursuit","reckless","high", ctx.isNight ? "night":"day"];
+    const Z = ctx.zone;
+
+    const P = {
+      P1: [
+        "They don’t stop. The {vehicle} lunges forward and your siren becomes a question.",
+        "The stop becomes a run. {weather} turns every headlight into a knife.",
+        "They punch it. Traffic compresses and you feel policy tighten behind your ribs."
+      ],
+      P2: [
+        "They cut lanes toward an exit. Everyone else brakes late like it’s normal.",
+        "A gap opens for them. You have to decide if you’re following into it.",
+        "They ride the shoulder for a second. You see gravel spray like sparks."
+      ],
+      P3: [
+        "Dispatch wants updates. Your voice has to stay calm while everything else accelerates.",
+        "Units are ‘en route.’ That can mean seconds or forever.",
+        "Air says they’re trying to get eyes. You still have to survive the next corner."
+      ],
+      P4: [
+        "They blow a red light. A civilian hesitates at the worst possible time.",
+        "You get a near-miss that tastes metallic in your mouth.",
+        "A turn comes up too fast. Your tires talk back."
+      ],
+      P5: [
+        "Spike strips are available… but the location is crowded.",
+        "A PIT might work… but the road surface is wrong.",
+        "You have a moment to choose tactics before the next mess chooses you."
+      ],
+      P6: [
+        "They crash into a curb and keep going. The {vehicle} is limping but still dangerous.",
+        "They clip something and wobble. You sense the end coming, messy or clean.",
+        "They brake-check hard. Your heart decides to be loud."
+      ],
+      P7: [
+        "They bail on foot near {zone}. Darkness eats the gaps.",
+        "Door pops. Someone runs. Your world narrows to breathing and angles.",
+        "They disappear between buildings. You hear a fence rattle somewhere."
+      ],
+      P8: [
+        "It ends. The paperwork begins. Everyone asks if it was worth it.",
+        "After the adrenaline, you feel your hands shake in slow motion.",
+        "You replay choices like dashcam footage you can’t turn off."
+      ]
+    };
+
+    const t = fmt(P[stage][v] || "The pursuit evolves.", {...ctx, zone:Z});
+
+    // Each pursuit stage pushes toward risk management vs commitment.
+    // Early stages give terminate options; mid stages give tactics; end stages are aftermath.
+    if(stage === "P8"){
+      return {
+        tag: baseTag,
+        t,
+        L:{txt:"Write it clean.", fx: FX.paper, lead:null},
+        R:{txt:"Cut corners.", fx: FX.shortcut, lead:null},
+      };
+    }
+
+    // Termination becomes harder later; still offered sometimes.
+    const terminateAllowed = (stage === "P1" || stage === "P2" || stage === "P3" || stage === "P4");
+
+    if(stage === "P5"){
+      return {
+        tag: baseTag,
+        t,
+        L:{txt:"Choose the safe tactic.", fx: FX.safe, lead:{nextStage:true}},
+        R:{txt:"Choose the aggressive tactic.", fx: FX.chase, lead:{nextStage:true}},
+      };
+    }
+
+    if(stage === "P7"){
+      return {
+        tag: baseTag,
+        t,
+        L:{txt:"Contain and wait for units.", fx: FX.safe, lead:{nextStage:true}},
+        R:{txt:"Go after them on foot.", fx: FX.push, lead:{nextStage:true}},
+      };
+    }
+
+    return {
+      tag: baseTag,
+      t,
+      L:{txt: terminateAllowed ? "Terminate. Fall back." : "Back off a little.", fx: FX.safe, lead:{nextStage:true}},
+      R:{txt:"Stay with it.", fx: FX.chase, lead:{nextStage:true}},
+    };
+  }
+
+  function buildCoreStageCard(chain, stage, v, ctx, S){
+    const key = chain.key;
+    const tags = [...(chain.topic||[]), chain.intensity, ctx.isNight ? "night" : "day"];
+    const base = { tag: tags };
+
+    const chaseGate = (S)=> (S.heat >= 48) || (S.streakEnforce >= 3) || (chain.intensity === "high");
+
+    if(stage === "A"){
+      const prefix = ctx.isRepeat ? "You recognize the {vehicle}. " : "";
+      const prompts = {
+        speeding: [
+          prefix + "Your radar pings a {vehicle}. It’s {speed}, steady, like it’s testing you.",
+          prefix + "A {vehicle} floats past your hide with the confidence of someone who’s never been stopped.",
+          prefix + "Traffic is calm until a {vehicle} slices through it. {weather} makes distance feel shorter."
+        ],
+        weaving: [
+          prefix + "A {vehicle} weaves twice, then corrects too late. The pattern is starting to repeat.",
+          prefix + "You watch a {vehicle} drift to the line and back. The driver never fully commits to a lane.",
+          prefix + "A {vehicle} changes lanes like it’s dodging ghosts. Your gut says it’s not just impatience."
+        ],
+        no_plate: [
+          prefix + "A {vehicle} rolls by with no rear plate, just a blank bracket and confidence.",
+          prefix + "You catch a {vehicle} with a temporary tag folded in the window, unreadable from here.",
+          prefix + "A {vehicle} has a plate cover so dark it’s basically a dare."
+        ],
+        illegal_tint: [
+          prefix + "A {vehicle} passes and you can’t see a face. The tint is swallowing light.",
+          prefix + "Even in {weather}, the {vehicle} windows look painted on.",
+          prefix + "You pull alongside a {vehicle}. There’s a silhouette, nothing else."
+        ],
+        texting: [
+          prefix + "A {vehicle} keeps braking for no reason. The driver’s head keeps dipping.",
+          prefix + "You pace a {vehicle}. The lane position wobbles with every glance down.",
+          prefix + "At the light, a {vehicle} doesn’t go. When it does, it swerves like waking up."
+        ],
+        move_over: [
+          "You’re stopped with lights on. A {vehicle} blows past without moving over.",
+          "A {vehicle} squeezes by your shoulder stop like you’re not there.",
+          "You see it coming: a {vehicle} refuses the open lane and keeps speed."
+        ],
+        school_zone: [
+          "School zone lights flash. A {vehicle} doesn’t even tap brakes.",
+          "Parents watch the crosswalk like it’s a battlefield. A {vehicle} approaches too fast.",
+          "You post up near the zone. A {vehicle} treats it like a suggestion."
+        ],
+        construction: [
+          "Cones narrow the lane. A {vehicle} threads gaps like it’s a game.",
+          "Work crew is out. A {vehicle} speeds through with no hesitation.",
+          "The sign says SLOW. A {vehicle} answers with acceleration."
+        ],
+        unsecured_load: [
+          "A {vehicle} carries something loose. Straps flutter like they’re already giving up.",
+          "You spot a {hazard} bouncing in the bed of a {vehicle}.",
+          "The {vehicle} hits a seam. The load shifts enough to make you tense."
+        ],
+        commercial: [
+          "A {vehicle} with a company logo drifts over the line. The trailer sways a little.",
+          "You see a {vehicle} hauling heavy. The speed doesn’t match the weight.",
+          "A {vehicle} rolls by with tires that look tired. The tread is speaking."
+        ],
+        motorcycle: [
+          "A {vehicle} appears in your mirror, then disappears ahead. It’s moving like a rumor.",
+          "A {vehicle} lane-splits at speed. Your stomach drops before your foot moves.",
+          "You hear the {vehicle} before you see it. The exhaust is basically a warning."
+        ],
+        street_racing: [
+          "Two cars pace each other. Then one twitches—like a start signal you didn’t authorize.",
+          "You catch the sound first: throttle blips, then a pair of taillights launch.",
+          "A pack forms and breathes. Then it breaks loose, fast and stupid."
+        ],
+        dui_suspect: [
+          "{weather} at night makes everything slick. A {vehicle} can’t hold center.",
+          "A {vehicle} rides the fog line like it’s following it. That’s not normal driving.",
+          "The {vehicle} speed changes for no reason. Your instincts say impaired."
+        ],
+        dui_checkpoint: [
+          "Checkpoint detail starts. The first line of cars feels annoyed before you even speak.",
+          "Cones, vests, flashlights. A {vehicle} approaches too slow, too careful.",
+          "Your lane is set. A {vehicle} hesitates at the last cone like it’s deciding to run."
+        ],
+        minor_crash: [
+          "You come up on a fender-bender. Two drivers stand too close, voices too loud.",
+          "A {vehicle} sits crooked in the lane. Nobody’s hurt, but nobody’s calm.",
+          "A bump turned into a scene. Phones are out. Everyone wants you to pick a villain."
+        ],
+        major_crash: [
+          "A hard crash. Airbags, smoke, someone yelling for help. Your training clicks in.",
+          "Metal everywhere. {weather} makes it worse. You feel seconds becoming expensive.",
+          "A rollover. A crowd gathers like gravity. You need control, now."
+        ],
+        road_hazard: [
+          "A {hazard} sits in the lane. Drivers swerve late and angry.",
+          "Something fell off a truck. It’s small, but it could flip a bike.",
+          "You spot debris ahead. It’s nobody’s emergency until it is."
+        ],
+        breakdown: [
+          "A stranded {vehicle} sits with hazards on. The driver looks defeated, not dangerous.",
+          "Someone waved you down. A {vehicle} won’t start and traffic is impatient.",
+          "A {vehicle} is dead on the shoulder. The driver’s posture screams ‘bad day.’"
+        ],
+        complaint: [
+          "You get an email: complaint filed. The details are vague, the tone is sharp.",
+          "Supervisor flags a call. Someone says you ‘were rude’ during a stop.",
+          "A citizen wants your name. They already have your unit number."
+        ],
+        numbers_pressure: [
+          "Briefing is tense. ‘Stats are down.’ The room feels like a scale.",
+          "A supervisor glances at your activity log longer than your face.",
+          "You’re told to ‘be proactive.’ Nobody defines what that means."
+        ],
+        equipment_fail: [
+          "Your body cam battery warning flashes. You’ve got hours left.",
+          "Radar throws a weird reading twice. You stop trusting it.",
+          "Your printer spits blank paper like it’s mocking you."
+        ],
+        warrant_hit: [
+          "Stop seems normal until the return pings: a warrant. The tone in your chest changes.",
+          "Plate comes back with a hit. You feel your hands go steady.",
+          "Dispatch repeats the name twice. That’s never casual."
+        ],
+        stolen_vehicle: [
+          "The plate returns stolen. The driver doesn’t know you know yet.",
+          "A {vehicle} matches a BOLO. Close enough to matter.",
+          "You see steering column damage when the light hits it—stolen, maybe."
+        ],
+        gun_found: [
+          "You notice a shape under the seat when the door opens. Your pulse answers first.",
+          "A glovebox cracks open and you see it: metal, familiar, wrong place.",
+          "A loose shirt rides up. Something heavy prints at the waistband."
+        ],
+        livestream: [
+          "A phone is up before you speak. ‘Say it again,’ they smile.",
+          "Someone’s streaming you. Comments scroll faster than your patience.",
+          "A bystander narrates your stop like a sport."
+        ],
+        crowd_stop: [
+          "A stop draws a crowd. Not huge—just enough to change your options.",
+          "Two cars pull over nearby and park. People watch without blinking.",
+          "A friend of the driver arrives fast. Too fast."
+        ],
+        vip_name_drop: [
+          "Driver drops a name like a badge. The tone says they’ve used it before.",
+          "‘Do you know who I work for?’ The question is a threat in a suit.",
+          "They slide a business card out like it’s handcuffs for you."
+        ],
+        near_miss: [
+          "A brake-check chain reaction nearly tags your bumper. Your breath catches late.",
+          "A car darts across lanes and you feel the ‘almost’ in your bones.",
+          "You get cut off and see a kid in the back seat. You don’t like the math."
+        ],
+        injury: [
+          "Your knee pops stepping off the curb. Pain is instant and quiet.",
+          "You twist wrong on the shoulder. The ground feels like betrayal.",
+          "Your back tightens mid-shift. Every movement becomes a negotiation."
+        ],
+        burnout: [
+          "You stare at your MDT longer than the road. That’s not a good sign.",
+          "The radio chirps and you feel nothing. That scares you more than anger.",
+          "You’ve been ‘fine’ for weeks. Today it sounds like a lie."
+        ],
+
+        // persistent follow-ups
+        court_followup: [
+          prefix + "You get a subpoena with the {vehicle} case ID. It’s on your next shift.",
+          prefix + "Court reminder pops up. The stop you forgot is still alive on paper.",
+          prefix + "A prosecutor wants you to ‘clarify’ details. The tone is not friendly."
+        ],
+        ia_review: [
+          "IA requests footage. The email is polite, which makes it worse.",
+          "Supervisor says, ‘We need a statement.’ That’s never casual.",
+          "You’re told to ‘come in and talk.’ The hallway feels longer today."
+        ],
+        repeat_offender: [
+          "That {vehicle} is back. Same lane habits. Same attitude. Different day.",
+          "You spot the {vehicle} again. Something in your gut says it’ll escalate.",
+          "The {vehicle} shows up like it owns the road. You remember the last stop."
+        ],
+      };
+
+      const pool = prompts[key] || ["Something on the road doesn’t feel right.","A situation forms in front of you.","You catch a pattern you can’t unsee."];
+      const t = fmt(pool[v], ctx);
+
+      return {
+        ...base,
+        t,
+        L: { txt: "Observe first.", fx: FX.safe, lead: {stage:"B"} },
+        R: { txt: "Initiate stop.", fx: FX.cite, lead: {stage:"B", hot:true} },
+      };
+    }
+
+    if(stage === "B"){
+      const pool = [
+        "You approach the {vehicle}. The driver looks {vibe}. {hands}. {eyes}.",
+        "Window comes down. You catch {odor}. The driver’s voice is too practiced.",
+        "The driver hands you a {paper}. The handoff is faster than it should be."
+      ];
+      const t = fmt(pool[v], ctx);
+
+      return {
+        ...base,
+        t,
+        L: { txt: "Keep it calm.", fx: FX.calm, lead:{stage:"C"} },
+        R: { txt: "Take control.", fx: FX.hard, lead:{stage:"C", hot:true} },
+      };
+    }
+
+    if(stage === "C"){
+      const decisionPools = {
+        dui_suspect: [
+          ["Field tests.", "Cut them loose with a ride."],
+          ["Call backup.", "Handle it solo."],
+          ["Breath test request.", "Just cite and move on."]
+        ],
+        stolen_vehicle: [
+          ["Wait for backup.", "Felony stop now."],
+          ["Confirm VIN.", "Commit to the stop."],
+          ["Soft contact first.", "Box it in if it runs."]
+        ],
+        street_racing: [
+          ["Get plates quietly.", "Roll in and scatter."],
+          ["Target the worst.", "Let it go and document."],
+          ["Call units, stage up.", "Light them up fast."]
+        ],
+        complaint: [
+          ["Call the citizen.", "Let IA handle it."],
+          ["Write a memo.", "Ignore it."],
+          ["Ask for coaching.", "Defend yourself hard."]
+        ],
+        numbers_pressure: [
+          ["Hunt easy tickets.", "Work fewer, cleaner stops."],
+          ["Proactive detail.", "Low profile."],
+          ["Chase stats.", "Protect your headspace."]
+        ],
+        burnout: [
+          ["Take a breather.", "Push through."],
+          ["Eat and hydrate.", "Skip it, keep moving."],
+          ["Ask for a reset.", "Stay in the lane."]
+        ],
+        court_followup: [
+          ["Review footage first.", "Walk in cold."],
+          ["Speak plain English.", "Speak policy only."],
+          ["Ask ADA for context.", "Just answer questions."]
+        ],
+        ia_review: [
+          ["Cooperate fully.", "Get representation."],
+          ["Own your tone.", "Deny everything."],
+          ["Provide a timeline.", "Keep it minimal."]
+        ],
+      };
+
+      const pair = (decisionPools[key] ? decisionPools[key][v] : ["Issue a warning.", "Write the ticket."]);
+      const t = fmt([
+        "The moment arrives: what do you actually do with this?",
+        "Your decision here writes the rest of the shift.",
+        "This is where ‘routine’ becomes ‘case.’"
+      ][v], ctx);
+
+      const Ltxt = pair[0], Rtxt = pair[1];
+      const highRisk = (key.includes("dui") || key.includes("stolen") || key.includes("warrant") || key.includes("gun") || key.includes("ia_"));
+      const Lfx = highRisk ? FX.search : FX.warn;
+      const Rfx = highRisk ? FX.arrest : FX.cite;
+
+      return {
+        ...base,
+        t,
+        L: { txt: Ltxt, fx: Lfx, lead:{stage:"D"} },
+        R: { txt: Rtxt, fx: Rfx, lead:{stage:"D", hot:true} },
+      };
+    }
+
+    if(stage === "D"){
+      const canRun = ["motorcycle","street_racing","stolen_vehicle","warrant_hit","dui_suspect","gun_found","weaving","speeding","no_plate","repeat_offender"].includes(key);
+      const outcomes = [
+        "They comply. But you feel the eyes on you anyway.",
+        "They argue. Loud enough for nearby cars to slow and stare.",
+        canRun ? "They hesitate—then the engine tone changes. Not good." : "They hesitate like they’re deciding what you’re worth."
+      ];
+      const t = fmt(outcomes[v], ctx);
+
+      if(v === 2 && canRun){
+        return {
+          ...base,
+          t,
+          gate: chaseGate,
+          L: { txt: "Terminate. Fall back.", fx: FX.safe, lead:{stage:"E"} },
+          R: { txt: "Continue pursuit.", fx: FX.chase, lead:{stage:"E", pursue:true} },
+        };
+      }
+
+      return {
+        ...base,
+        t,
+        L: { txt: "De-escalate.", fx: FX.calm, lead:{stage:"E"} },
+        R: { txt: "Enforce anyway.", fx: FX.hard, lead:{stage:"E", hot:true} },
+      };
+    }
+
+    if(stage === "E"){
+      const pool = [
+        "{aftermath}",
+        "You replay your own tone in your head. That’s never free.",
+        "The stop is over, but the consequences are just starting."
+      ];
+      const t = fmt(pool[v], ctx);
+
+      return {
+        ...base,
+        t,
+        L: { txt: "Write it clean.", fx: FX.paper, lead:null },
+        R: { txt: "Cut corners.", fx: FX.shortcut, lead:null },
+      };
+    }
+
+    return { ...base, t:"Something happens.", L:{txt:"Continue.", fx:{}, lead:null}, R:{txt:"Continue.", fx:{}, lead:null} };
+  }
+
+  // ----------------- state + persistence -----------------
+  const KEY = "traffic-team-save-v3";
+
+  const DEFAULT_STATE = () => ({
+    v: 3,
+    seed: Math.floor(Date.now()/1000) ^ 0xBADC0DE,
+    turn: 0,
+
+    public: 50,
+    dept: 50,
+    health: 50,
+    heat: 45,
+
+    day: 1,
+    shift: 1,
+    isNight: false,
+    zone: "US-17",
+
+    streakEnforce: 0,
+    streakDeEsc: 0,
+
+    // queue items: {caseId, chainKey, stage, v, ctx, stageIndex, stageList}
+    caseSeq: 0,
+    queue: [],
+
+    // scheduled persistent follow-ups: {runAtTurn, chainKey, ctx, reason}
+    scheduled: [],
+
+    // repeat offender pool
+    subjectSeq: 0,
+    subjects: [],
+
+    // cooldowns
+    recentKeys: [],
+    recentCardIds: [],
+
+    startedAt: nowISO(),
+    updatedAt: nowISO(),
+  });
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return null;
+      const s = JSON.parse(raw);
+      if(!s || s.v !== 3) return null;
+      return s;
+    }catch{ return null; }
+  }
+  function saveState(S){
+    S.updatedAt = nowISO();
+    localStorage.setItem(KEY, JSON.stringify(S));
+  }
+
+  let S = loadState() || DEFAULT_STATE();
+  let rng = mulberry32(S.seed);
+
+  // ----------------- UI refs -----------------
+  const el = (id)=>document.getElementById(id);
+  const barPublic = el("barPublic"), barDept = el("barDept"), barHealth = el("barHealth"), barHeat = el("barHeat");
+  const valPublic = el("valPublic"), valDept = el("valDept"), valHealth = el("valHealth"), valHeat = el("valHeat");
+  const prompt = el("prompt"), hint = el("hint"), sceneLine = el("sceneLine"), streakLine = el("streakLine");
+  const btnLeft = el("btnLeft"), btnRight = el("btnRight");
+  const pillTime = el("pillTime"), pillZone = el("pillZone"), pillShift = el("pillShift");
+  const footerLine = el("footerLine");
+  const toast = el("toast");
+
+  function toastMsg(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>toast.classList.remove("show"), 1900);
+  }
+
+  // ----------------- time + zone -----------------
+  function formatTimeBits(){
+    const dow = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][((S.day-1)%7+7)%7];
+    const shiftName = S.isNight ? "Night Shift" : "Day Shift";
+    return {dow, shiftName};
+  }
+
+  function setZone(){
+    const pool = S.isNight ? ZONES_NIGHT : ZONES_DAY;
+    const roll = rng();
+    if(roll < 0.55) return S.zone;
+    return pick(pool, rng);
+  }
+
+  function tickTime(){
+    if(S.turn > 0 && S.turn % 14 === 0){
+      S.shift += 1;
+      S.isNight = !S.isNight;
+      S.zone = setZone();
+      toastMsg(S.isNight ? "Night shift." : "Day shift.");
+    }
+    if(S.turn > 0 && S.turn % 28 === 0){
+      S.day = ((S.day % 7) + 1);
+    }
+    // shift drift
+    if(S.turn > 0 && S.turn % 14 === 0){
+      S.health = clamp(S.health - (S.isNight ? 1 : 0), 0, 100);
+      S.heat = clamp(S.heat + (S.isNight ? 1 : -1), 0, 100);
+    }
+  }
+
+  function nextShiftTurn(turn){
+    const next = Math.ceil((turn + 1) / 14) * 14;
+    return next;
+  }
+
+  // ----------------- chain selection (zones + heat + streaks) -----------------
+  function chainWeight(chain){
+    // Don’t randomly start pursuit; it’s injected by “Continue pursuit.”
+    if(chain.isPursuit) return 0.001;
+
+    let w = 1.0;
+
+    // Heat intensity bias
+    if(chain.intensity === "low")  w *= (S.heat < 45) ? 1.35 : 0.70;
+    if(chain.intensity === "mid")  w *= (S.heat < 35) ? 0.85 : (S.heat < 70 ? 1.20 : 1.00);
+    if(chain.intensity === "high") w *= (S.heat >= 52) ? 1.45 : 0.55;
+
+    // Night bias
+    if(S.isNight && chain.nightBias) w *= 1.45;
+
+    // Streak shaping
+    if(S.streakEnforce >= 3 && (chain.topic||[]).includes("community")) w *= 1.25;
+    if(S.streakDeEsc >= 3 && (chain.topic||[]).includes("reckless")) w *= 1.18;
+
+    // Zone profile shaping
+    const prof = zoneProfile(S.zone);
+    for(const t of (chain.topic||[])){
+      if(prof.topicMult[t] != null) w *= prof.topicMult[t];
+    }
+    if(prof.keyMult[chain.key] != null) w *= prof.keyMult[chain.key];
+
+    // Cooldown by key
+    if(S.recentKeys.includes(chain.key)) w *= 0.45;
+
+    // Keep pure admin from dominating unless it’s scheduled
+    if((chain.topic||[]).includes("admin") && !(chain.topic||[]).includes("stop") && chain.key !== "complaint") w *= 0.80;
+
+    return w;
+  }
+
+  function weightedPick(arr){
+    let total = 0;
+    const ws = arr.map(a => {
+      const w = chainWeight(a);
+      total += w;
+      return w;
+    });
+    let r = rng() * total;
+    for(let i=0;i<arr.length;i++){
+      r -= ws[i];
+      if(r <= 0) return arr[i];
+    }
+    return arr[arr.length-1];
+  }
+
+  // ----------------- scheduling persistent cases -----------------
+  function scheduleChain(chainKey, ctx, runAtTurn, reason){
+    S.scheduled.push({chainKey, ctx, runAtTurn, reason: reason || ""});
+    // keep list bounded
+    S.scheduled.sort((a,b)=>a.runAtTurn-b.runAtTurn);
+    if(S.scheduled.length > 30) S.scheduled = S.scheduled.slice(0,30);
+  }
+
+  function flushScheduled(){
+    // move due items into the front of queue
+    const due = [];
+    const keep = [];
+    for(const it of S.scheduled){
+      if(it.runAtTurn <= S.turn) due.push(it);
+      else keep.push(it);
+    }
+    S.scheduled = keep;
+
+    // Due items become new chains injected BEFORE fresh chain creation
+    for(const it of due){
+      startChain(it.chainKey, {ctxOverride: it.ctx, injected:true});
+      toastMsg(it.reason ? it.reason : "A case comes back around.");
+    }
+  }
+
+  // ----------------- queue & chain creation -----------------
+  function startChain(chainKey, opts={}){
+    const chain = getChain(chainKey);
+    const caseId = ++S.caseSeq;
+
+    const stageList = chain.isPursuit ? PURSUIT_STAGES : CORE_STAGES;
+    const ctx = opts.ctxOverride ? opts.ctxOverride : makeCtx(chain.key, S, rng);
+
+    // enqueue stage items
+    for(let i=0;i<stageList.length;i++){
+      const stage = stageList[i];
+      const v = Math.floor(rng() * 3);
+      S.queue.push({caseId, chainKey: chain.key, stage, v, ctx, stageIndex:i, stageList});
+    }
+
+    // cooldown
+    if(!chain.isPursuit){
+      S.recentKeys.unshift(chain.key);
+      S.recentKeys = S.recentKeys.slice(0, 8);
+    }
+  }
+
+  function injectPursuit(ctx){
+    // Put pursuit chain in front of existing queue, keep the rest after.
+    const snap = S.queue.slice(0);
+    S.queue.length = 0;
+    startChain("pursuit", {ctxOverride: ctx, injected:true});
+    S.queue.push(...snap);
+  }
+
+  // ----------------- card pick/render -----------------
+  let current = null;
+
+  function nextCard(initial=false){
+    tickTime();
+    S.zone = setZone();
+
+    flushScheduled();
+
+    if(S.queue.length === 0){
+      // Start a new live chain
+      const chain = weightedPick(CHAIN_TYPES.filter(c => !c.isPursuit));
+      startChain(chain.key);
+
+      // Parallel chain chance at high heat
+      if(S.heat >= 60 && chance(rng, 0.22)){
+        const chain2 = weightedPick(CHAIN_TYPES.filter(c => !c.isPursuit));
+        startChain(chain2.key);
+      }
+    }
+
+    const item = S.queue.shift();
+    const chain = getChain(item.chainKey);
+
+    let card;
+    if(chain.isPursuit){
+      card = buildPursuitStage(item.stage, item.v, item.ctx);
+    } else {
+      card = buildCoreStageCard(chain, item.stage, item.v, item.ctx, S);
+      // apply gate if present
+      if(card.gate && !card.gate(S)){
+        card.t = card.t + " Policy tightens around your hands.";
+        card.L = {txt:"Back off.", fx: FX.safe, lead:{stage:"E"}};
+        card.R = {txt:"Write it clean.", fx: FX.paper, lead:{stage:"E"}};
+      }
+    }
+
+    const cardId = `${item.chainKey}:${item.caseId}:${item.stage}:${item.v}`;
+    S.recentCardIds.unshift(cardId);
+    S.recentCardIds = S.recentCardIds.slice(0, 18);
+
+    current = { ...card, _item:item, _chain:chain, _cardId:cardId };
+
+    prompt.textContent = card.t;
+    sceneLine.textContent = `${S.isNight ? "Night" : "Day"} • ${item.ctx.zone}`;
+    hint.textContent = chain.isPursuit ? "Pursuit chain (8 stages). Decisions compound." : "This is part of a case chain. It carries forward.";
+
+    btnLeft.textContent = card.L.txt;
+    btnRight.textContent = card.R.txt;
+    btnLeft.onclick = () => choose("L");
+    btnRight.onclick = () => choose("R");
+
+    if(!initial) saveState(S);
+    render();
+  }
+
+  function applyFx(fx){
+    if(!fx) return;
+    if(typeof fx.public === "number") S.public = clamp(S.public + fx.public, 0, 100);
+    if(typeof fx.dept === "number")   S.dept   = clamp(S.dept   + fx.dept,   0, 100);
+    if(typeof fx.health === "number") S.health = clamp(S.health + fx.health, 0, 100);
+    if(typeof fx.heat === "number")   S.heat   = clamp(S.heat   + fx.heat,   0, 100);
+  }
+
+  function endCheck(){
+    const dead =
+      (S.health <= 0) ? "You fold mid-shift. Pain takes the wheel." :
+      (S.dept   <= 0) ? "Admin pulls you off the street. Your run ends on paperwork." :
+      (S.public <= 0) ? "The public turns on you. Every stop becomes a fight. Reassigned." :
+      (S.heat   <= 0) ? "You go invisible. No presence, no momentum. Quiet burnout." :
+      null;
+
+    if(dead){
+      prompt.textContent = dead;
+      hint.textContent = "Tap New Run to start again.";
+      btnLeft.textContent = "New Run";
+      btnRight.textContent = "Export Save";
+      btnLeft.onclick = () => startNewRun();
+      btnRight.onclick = () => exportSave();
+      return true;
+    }
+    if(S.heat >= 100){
+      S.heat = 95;
+      S.health = clamp(S.health - 2, 0, 100);
+      S.public = clamp(S.public - 2, 0, 100);
+      toastMsg("Heat peaked. The street feels tighter.");
+    }
+    return false;
+  }
+
+  function choose(side){
+    if(!current) return;
+
+    const item = current._item;
+    const chain = current._chain;
+    const choice = (side === "L") ? current.L : current.R;
+    const enforce = (side === "R");
+
+    // streak shaping
+    if(enforce){
+      S.streakEnforce = clamp(S.streakEnforce + 1, 0, 9);
+      S.streakDeEsc   = clamp(S.streakDeEsc - 1, 0, 9);
+    }else{
+      S.streakDeEsc   = clamp(S.streakDeEsc + 1, 0, 9);
+      S.streakEnforce = clamp(S.streakEnforce - 1, 0, 9);
+    }
+
+    applyFx(choice.fx);
+
+    // global drift
+    S.health = clamp(S.health - 0.18, 0, 100);
+    S.heat   = clamp(S.heat + (enforce ? 0.45 : -0.18), 0, 100);
+
+    // ----- (1) Dedicated pursuit injection -----
+    // If core chain D-stage chooses "Continue pursuit", we inject an 8-stage pursuit chain immediately.
+    if(!chain.isPursuit && item.stage === "D" && choice.lead && choice.lead.pursue){
+      injectPursuit(item.ctx);
+      toastMsg("Pursuit begins.");
+    }
+
+    // ----- (2) Persistent fallout injection (IA/complaint/court) -----
+    // When a case ends (E stage), schedule follow-ups across shifts depending on chain + how you handled it.
+    if(!chain.isPursuit && item.stage === "E"){
+      const nextShift = nextShiftTurn(S.turn);
+      const offset = 1 + Math.floor(rng() * 4); // soon after shift starts
+      const runAt = nextShift + offset;
+
+      const k = item.chainKey;
+      const cutCorners = (side === "R"); // E-stage right is "Cut corners." by design
+      const hotRun = (S.heat >= 55) || (S.streakEnforce >= 3);
+
+      // court followups
+      if(["dui_suspect","major_crash","warrant_hit","stolen_vehicle","gun_found"].includes(k)){
+        scheduleChain("court_followup", item.ctx, runAt, "Court follows you into the next shift.");
+      }
+
+      // IA/oversight followups
+      if(["complaint","livestream","crowd_stop"].includes(k) || (cutCorners && chance(rng, 0.55)) || (hotRun && chance(rng, 0.25))){
+        scheduleChain("ia_review", item.ctx, runAt + 2, "IA/oversight lands after you thought it was done.");
+      }
+
+      // repeat offender thread (same subject shows up later)
+      if(["speeding","weaving","no_plate","illegal_tint","texting"].includes(k)){
+        if(chance(rng, 0.25)){
+          const later = S.turn + 10 + Math.floor(rng()*18); // within same or next shift
+          const ctx2 = makeCtx("repeat_offender", S, rng, {forceSubjectId: item.ctx.subjectId});
+          scheduleChain("repeat_offender", ctx2, later, "A familiar vehicle shows up again.");
+        }
+      }
+    }
+
+    // Pursuit aftermath can schedule court/IA too
+    if(chain.isPursuit && item.stage === "P8"){
+      const nextShift = nextShiftTurn(S.turn);
+      if(chance(rng, 0.40)){
+        scheduleChain("court_followup", item.ctx, nextShift + 2, "Pursuit paperwork grows teeth later.");
+      }
+      if(chance(rng, 0.30) && (S.heat >= 55 || enforce)){
+        scheduleChain("ia_review", item.ctx, nextShift + 3, "A pursuit review gets scheduled.");
+      }
+    }
+
+    S.turn += 1;
+
+    if(endCheck()){
+      saveState(S);
+      render();
+      return;
+    }
+
+    saveState(S);
+    nextCard();
+  }
+
+  // ----------------- render -----------------
+  function render(){
+    barPublic.style.width = `${S.public}%`; valPublic.textContent = S.public;
+    barDept.style.width   = `${S.dept}%`;   valDept.textContent   = S.dept;
+    barHealth.style.width = `${S.health}%`; valHealth.textContent = S.health;
+    barHeat.style.width   = `${S.heat}%`;   valHeat.textContent   = S.heat;
+
+    const {dow, shiftName} = formatTimeBits();
+    pillTime.textContent = `${dow} • Turn ${S.turn}`;
+    pillZone.textContent = `Zone: ${S.zone}`;
+    pillShift.textContent = `${shiftName}`;
+
+    streakLine.textContent =
+      (S.streakEnforce >= 3) ? "You’re hunting." :
+      (S.streakDeEsc >= 3)   ? "You’re playing it soft." : "—";
+
+    const coreChains = CHAIN_TYPES.filter(c => !c.isPursuit).length;
+    const cardsPerRunApprox = (coreChains * 15) + 24; // 8 pursuit stages × 3 variants
+    footerLine.textContent =
+      `Chains: ${coreChains}+pursuit • Cards/run: ~${cardsPerRunApprox} • Queue: ${S.queue.length} • Scheduled: ${S.scheduled.length}`;
+  }
+
+  // ----------------- new run / import export -----------------
+  function startNewRun(){
+    S = DEFAULT_STATE();
+    rng = mulberry32(S.seed);
+    saveState(S);
+    toastMsg("New run started.");
+    nextCard(true);
+  }
+
+  function exportSave(){
+    const data = JSON.stringify(S, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "traffic-team-save.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toastMsg("Save exported.");
+  }
+
+  function importSave(){
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if(!file) return;
+      try{
+        const text = await file.text();
+        const s = JSON.parse(text);
+        if(!s || s.v !== 3) throw new Error("Bad save format");
+        S = s;
+        rng = mulberry32(S.seed);
+        saveState(S);
+        toastMsg("Save imported.");
+        nextCard(true);
+      }catch(e){
+        toastMsg("Import failed.");
+      }
+    };
+    input.click();
+  }
+
+  // ----------------- buttons -----------------
+  el("btnSave").onclick = () => { saveState(S); toastMsg("Saved."); render(); };
+  el("btnNew").onclick  = () => startNewRun();
+  el("btnExport").onclick = () => exportSave();
+  el("btnImport").onclick = () => importSave();
+
+  // ----------------- PWA SW -----------------
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", async () => {
+      try{ await navigator.serviceWorker.register("./sw.js"); }catch{}
+    });
+  }
+
+  // ----------------- boot -----------------
+  saveState(S);
+  nextCard(true);
+})();
+</script>
+</body>
+</html>
